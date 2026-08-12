@@ -9,37 +9,37 @@ answer/context trace trong `artifacts/actual_answers.json` trước khi kết lu
 
 ## 1. Benchmark Results Summary
 
-**Overall pass rate:** ____%
+**Overall pass rate:** 5.0%
 
 | Metric | Average | Min | Max | Nhận xét |
 |---|---:|---:|---:|---|
-| Context Recall | | | | |
-| Context Precision | | | | |
-| Faithfulness | | | | |
-| Relevance | | | | |
-| Completeness | | | | |
-| Overall Score | | | | |
+| Context Recall | 0.830 | 0.111 | 1.000 | Good - Retrieval thường lấy đúng và đủ tài liệu |
+| Context Precision | 0.902 | 0.333 | 1.000 | Good - Tài liệu đúng thường nằm ở vị trí đầu |
+| Faithfulness | 0.128 | 0.000 | 0.773 | Significant Issues - Rất tệ, model liên tục bịa thông tin không có trong tài liệu |
+| Relevance | 0.702 | 0.333 | 1.000 | Needs Work - Câu trả lời tương đối liên quan nhưng còn lan man |
+| Completeness | 0.729 | 0.111 | 1.000 | Needs Work - Thỉnh thoảng bị sót một số chi tiết |
+| Overall Score | 0.518 | 0.178 | 0.758 | Significant Issues - Tỉ lệ đậu chỉ 5% do Faithfulness kéo xuống |
 
 **Score interpretation**
 
-- Metrics/cases ở mức Good (0.8–1.0): ____
-- Metrics/cases ở mức Needs Work (0.6–0.8): ____
-- Metrics/cases ở mức Significant Issues (<0.6): ____
+- Metrics/cases ở mức Good (0.8–1.0): Context Recall, Context Precision
+- Metrics/cases ở mức Needs Work (0.6–0.8): Relevance, Completeness
+- Metrics/cases ở mức Significant Issues (<0.6): Faithfulness, Overall Score
 
 **Failure type distribution**
 
 | Failure Type | Count | Percentage |
 |---|---:|---:|
-| hallucination | | |
-| irrelevant | | |
-| incomplete | | |
-| off_topic | | |
-| refusal | | |
+| hallucination | 19 | 100.0% |
+| irrelevant | 0 | 0% |
+| incomplete | 0 | 0% |
+| off_topic | 0 | 0% |
+| refusal | 0 | 0% |
 
 **Chẩn đoán tổng quan:** Vấn đề chính nằm ở retrieval, generation hay cả hai?
 Dùng ít nhất hai metrics để bảo vệ kết luận.
 
-> *Câu trả lời:*
+> *Câu trả lời:* Vấn đề cốt lõi nằm ở bước **Generation**. Bằng chứng là `Context Recall (0.830)` và `Context Precision (0.902)` đều ở mức rất tốt, chứng tỏ công cụ tìm kiếm đã lấy ra được đúng tài liệu cần thiết. Tuy nhiên, `Faithfulness (0.128)` lại ở mức chạm đáy, đồng thời 100% các lỗi thất bại đều bị gán là `hallucination`. Điều này có nghĩa là con LLM (generation) không chịu sử dụng thông tin trong context đã được cung cấp mà tự ý suy diễn hoặc dùng kiến thức bên ngoài để trả lời.
 
 ---
 
