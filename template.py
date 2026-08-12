@@ -695,8 +695,11 @@ class FailureAnalyzer:
             dict mapping failure_type → count.
             Example: {"hallucination": 3, "irrelevant": 2, "incomplete": 5}
         """
-        # TODO
-        raise NotImplementedError("Implement categorize_failures")
+        categories = {}
+        for f in failures:
+            if f.failure_type:
+                categories[f.failure_type] = categories.get(f.failure_type, 0) + 1
+        return categories
 
     def find_root_cause(self, failure: EvalResult) -> str:
         """
@@ -708,8 +711,23 @@ class FailureAnalyzer:
             "Answer is missing key information — increase context window or improve generation"
             "Multiple issues detected — review full pipeline"
         """
-        # TODO: compare faithfulness, relevance, completeness, return appropriate string
-        raise NotImplementedError("Implement find_root_cause")
+        scores = {
+            "faithfulness": failure.faithfulness,
+            "relevance": failure.relevance,
+            "completeness": failure.completeness
+        }
+        
+        low_scores = sum(1 for s in scores.values() if s < 0.5)
+        if low_scores > 1:
+            return "Multiple issues detected — review full pipeline"
+            
+        lowest_metric = min(scores, key=scores.get)
+        if lowest_metric == "faithfulness":
+            return "Context is missing or irrelevant — improve retrieval"
+        elif lowest_metric == "relevance":
+            return "Answer does not address the question — improve prompt clarity"
+        else:
+            return "Answer is missing key information — increase context window or improve generation"
 
     def generate_improvement_log(self, failures: list, suggestions: list[str]) -> str:
         """Generate a Markdown table logging failures and improvement actions.
@@ -725,10 +743,20 @@ class FailureAnalyzer:
 
         Returns:
             Markdown table string with a row per failure. Status is always "Open".
-
-        TODO: Build markdown table with failure details + matched suggestions
         """
-        raise NotImplementedError
+        lines = [
+            "| Failure ID | Type | Root Cause | Suggested Fix | Status |",
+            "|------------|------|------------|---------------|--------|"
+        ]
+        
+        for i, failure in enumerate(failures):
+            f_id = f"F{i+1:03d}"
+            f_type = failure.failure_type or "unknown"
+            root_cause = self.find_root_cause(failure)
+            fix = suggestions[i] if i < len(suggestions) else ""
+            lines.append(f"| {f_id} | {f_type} | {root_cause} | {fix} | Open |")
+            
+        return "\n".join(lines)
 
     def generate_improvement_suggestions(
         self, failures: list[EvalResult]
@@ -746,8 +774,30 @@ class FailureAnalyzer:
         Returns:
             List of at least 3 suggestion strings (or fewer if failures is empty).
         """
-        # TODO: analyze categorized failures and return suggestions
-        raise NotImplementedError("Implement generate_improvement_suggestions")
+        if not failures:
+            return []
+            
+        categories = self.categorize_failures(failures)
+        suggestions = []
+        
+        if categories.get("hallucination", 0) > 0:
+            suggestions.append("Implement hallucination checker to filter unsupported claims")
+        if categories.get("irrelevant", 0) > 0:
+            suggestions.append("Clarify the prompt to enforce direct answers")
+        if categories.get("incomplete", 0) > 0:
+            suggestions.append("Increase chunk size in RAG pipeline to reduce context fragmentation")
+            
+        defaults = [
+            "Add few-shot examples showing complete answers to improve completeness",
+            "Tune retrieval thresholds and embeddings",
+            "Review guardrails to prevent false refusals"
+        ]
+        
+        for d in defaults:
+            if len(suggestions) < 3:
+                suggestions.append(d)
+                
+        return suggestions
 
 
 # ---------------------------------------------------------------------------
