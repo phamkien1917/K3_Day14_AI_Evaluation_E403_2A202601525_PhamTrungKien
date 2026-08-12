@@ -390,8 +390,7 @@ class LLMJudge:
     """
 
     def __init__(self, judge_llm_fn: Callable[[str], str]) -> None:
-        # TODO: store judge_llm_fn
-        pass
+        self.judge_llm_fn = judge_llm_fn
 
     def score_response(
         self,
@@ -423,8 +422,29 @@ class LLMJudge:
                 "reasoning": str,               # raw LLM explanation
             }
         """
-        # TODO
-        raise NotImplementedError("Implement score_response")
+        prompt = f"Question: {question}\nAnswer: {answer}\nRubric: {rubric}"
+        response = self.judge_llm_fn(prompt)
+        
+        import json
+        import re
+        
+        try:
+            match = re.search(r'\{.*\}', response, re.DOTALL)
+            if match:
+                parsed = json.loads(match.group(0))
+                if "scores" in parsed and "reasoning" in parsed:
+                    return parsed
+            
+            parsed = json.loads(response)
+            if "scores" in parsed and "reasoning" in parsed:
+                return parsed
+        except Exception:
+            pass
+            
+        return {
+            "scores": {k: 0.5 for k in rubric.keys()},
+            "reasoning": "Failed to parse"
+        }
 
     def detect_bias(self, scores_batch: list[dict[str, Any]]) -> dict[str, Any]:
         """
@@ -445,8 +465,33 @@ class LLMJudge:
                 "severity_bias":   bool,
             }
         """
-        # TODO
-        raise NotImplementedError("Implement detect_bias")
+        if not scores_batch:
+            return {"positional_bias": False, "leniency_bias": False, "severity_bias": False}
+            
+        total = 0.0
+        count = 0
+        for item in scores_batch:
+            for score in item.get("scores", {}).values():
+                total += score
+                count += 1
+                
+        avg = total / count if count > 0 else 0.5
+        
+        # Simplistic positional bias check: does first item score higher than the rest?
+        pos_bias = False
+        if len(scores_batch) > 1 and count > 0:
+            first_scores = scores_batch[0].get("scores", {}).values()
+            first_avg = sum(first_scores) / max(1, len(first_scores))
+            rest_total = sum(sum(item.get("scores", {}).values()) for item in scores_batch[1:])
+            rest_count = sum(len(item.get("scores", {})) for item in scores_batch[1:])
+            rest_avg = rest_total / max(1, rest_count)
+            pos_bias = (first_avg - rest_avg) > 0.1
+            
+        return {
+            "positional_bias": pos_bias,
+            "leniency_bias": avg > 0.8,
+            "severity_bias": avg < 0.3
+        }
 
 
 # ---------------------------------------------------------------------------
